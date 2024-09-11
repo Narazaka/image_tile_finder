@@ -51,6 +51,16 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
+  msix: ^3.16.7
+
+msix_config:
+  display_name: Image Tile Finder
+  publisher_display_name: Narazaka
+  identity_name: 33175Narazaka.ImageTileFinder
+  logo_path: ImageTileFinder.png
+  languages: en-us, ja-jp
+  store: true
+  publisher: CN=4305BF1C-310A-44CC-8F08-90D00CDB831F
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
