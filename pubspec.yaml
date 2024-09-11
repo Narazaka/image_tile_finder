@@ -30,6 +30,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  desktop_drop: 0.4.4
+  opencv_dart: ^1.2.4
+  path: ^1.9.0
+  file_picker: ^8.1.2
+  window_manager: ^0.4.2
 
 
   # The following adds the Cupertino Icons font to your application.
