@@ -20,4 +20,12 @@ class ImageMat {
   Uint8List encoded;
   ImageMat(this.mat, this.encoded);
   Size get size => Size(mat.shape[1], mat.shape[0]);
+
+  void save(String path) async {
+    await cv.imwriteAsync(path, mat);
+  }
+
+  void dispose() {
+    mat.dispose();
+  }
 }

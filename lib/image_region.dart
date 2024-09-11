@@ -42,10 +42,6 @@ class ImageRegion {
         (rate.height * sourceImageSize.height).round());
   }
 
-  cvcore.Size get imageLeftTop => cvcore.Size(image.x, image.y);
-  cvcore.Size get imageRightBottom => cvcore.Size(image.right, image.bottom);
-  cvcore.Size get imageSize => cvcore.Size(image.width, image.height);
-
   ImageRegion setSourceImageSize(cvcore.Size sourceImageSize) {
     return ImageRegion(
         sourceImageSize: sourceImageSize,

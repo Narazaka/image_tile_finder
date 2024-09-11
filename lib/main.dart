@@ -87,6 +87,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   @override
   void dispose() {
     windowManager.removeListener(this);
+    _source?.dispose();
+    _result?.dispose();
     super.dispose();
   }
 
@@ -106,6 +108,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     var tex = await ImageMat.readAsync(path);
     if (tex == null) {
       setState(() {
+        _source?.dispose();
         _source = null;
         _imageRegion = ImageRegion.zero();
       });
@@ -113,6 +116,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     }
     setState(() {
       _sourcePath = path;
+      _source?.dispose();
       _source = tex;
       _imageRegion = ImageRegion.zero().setSourceImageSize(tex.size);
     });
@@ -186,7 +190,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     if (dest == null) {
       return;
     }
-    cv.imwrite(dest, _result!.mat);
+    _result!.save(dest);
   }
 
   void _onStartDetect() async {
@@ -204,8 +208,10 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     final result = await ImageMat.fromMat(resultMat);
     var tiled = cv.repeat(resultMat, 2, 2);
     var (successTiled, encodedTiled) = await cv.imencodeAsync(".png", tiled);
+    tiled.dispose();
     setState(() {
       _resultFrac = frac;
+      _result?.dispose();
       _result = result;
       _encodedResultTiledImage = encodedTiled;
     });
