@@ -110,6 +110,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       setState(() {
         _source?.dispose();
         _source = null;
+        _result?.dispose();
+        _result = null;
+        _encodedResultTiledImage = null;
         _imageRegion = ImageRegion.zero();
       });
       return;
@@ -118,6 +121,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       _sourcePath = path;
       _source?.dispose();
       _source = tex;
+      _result?.dispose();
+      _result = null;
+      _encodedResultTiledImage = null;
       _imageRegion = ImageRegion.zero().setSourceImageSize(tex.size);
     });
   }
@@ -193,11 +199,13 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     _result!.save(dest);
   }
 
+  bool get _canDetect =>
+      _source != null &&
+      _imageRegion.image.width > 0 &&
+      _imageRegion.image.height > 0;
+
   void _onStartDetect() async {
-    if (_source == null) {
-      return;
-    }
-    if (_imageRegion.image.width == 0 || _imageRegion.image.height == 0) {
+    if (!_canDetect) {
       return;
     }
     var (resultMat, frac) =
@@ -222,17 +230,17 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     return DropTarget(
         onDragDone: _onDragDone,
         child: Scaffold(
-          appBar: AppBar(
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-            title: Text(widget.title),
-          ),
           body: Center(
               child: Row(children: <Widget>[
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
+                    style: TextStyle(
+                        fontSize: Theme.of(context)
+                            .textTheme
+                            .headlineLarge!
+                            .fontSize),
                     'source image',
                   ),
                   Listener(
@@ -242,7 +250,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                       child: Stack(
                         children: [
                           _source == null
-                              ? const Text("no image")
+                              ? const Text("drag & drop the image!")
                               : Image.memory(
                                   key: _imageContainerKey, _source!.encoded),
                           Positioned.fill(
@@ -258,7 +266,13 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
             Expanded(
               child: Column(
                 children: [
-                  const Text("detect"),
+                  Text(
+                      style: TextStyle(
+                          fontSize: Theme.of(context)
+                              .textTheme
+                              .headlineLarge!
+                              .fontSize),
+                      "detect tile"),
                   Text("image size ${_source?.size.string}"),
                   Text(
                       "${_imageRegion.image.leftTop.string} - ${_imageRegion.image.rightBottom.string} / ${_imageRegion.image.size.string}"),
@@ -268,8 +282,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                               Theme.of(context).colorScheme.primary,
                           foregroundColor:
                               Theme.of(context).colorScheme.onPrimary),
-                      onPressed: _onStartDetect,
-                      child: const Text("do")),
+                      onPressed: _canDetect ? _onStartDetect : null,
+                      child: const Text("detect!")),
                   Container(
                     child: _result == null
                         ? const Text("no image")
@@ -278,7 +292,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                   _result == null || _source == null
                       ? const SizedBox(width: 1, height: 1)
                       : Column(children: [
-                          Text(_result!.size.string),
+                          Text(
+                              "${_imageRegion.image.size.string} -> ${_result!.size.string}"),
                           const Text("tiling:"),
                           SizedBox(
                             width: 100,
@@ -303,24 +318,23 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                                       text: (_source!.size.height /
                                               _result!.size.height)
                                           .toString()))),
+                          Text("frac: $_resultFrac"),
                         ]),
-                  Text("frac: $_resultFrac"),
                   _encodedResultTiledImage == null
                       ? const SizedBox(width: 1, height: 1)
-                      : ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.inversePrimary,
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.primary),
-                          onPressed: _onSave,
-                          child: const Text("save")),
-                  const Text("tiled preview"),
-                  Container(
-                    child: _encodedResultTiledImage == null
-                        ? const Text("no tiled")
-                        : Image.memory(_encodedResultTiledImage!),
-                  ),
+                      : Column(children: [
+                          ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .inversePrimary,
+                                  foregroundColor:
+                                      Theme.of(context).colorScheme.primary),
+                              onPressed: _onSave,
+                              child: const Text("save")),
+                          const Text("tiled preview"),
+                          Image.memory(_encodedResultTiledImage!)
+                        ]),
                 ],
               ),
             )
