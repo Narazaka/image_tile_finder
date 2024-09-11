@@ -3,11 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
-import 'package:opencv_dart/core.dart' as cvcore;
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:window_manager/window_manager.dart';
 import "process_tile.dart";
+import 'image_region.dart';
+import 'image_texture.dart';
+import 'util.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,32 +72,11 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
 
   bool _dragging = false;
   String? _sourcePath;
-  cvcore.Mat? _sourceMat;
-  Uint8List? _encodedSourceImage;
-  cvcore.Size _imageSize = cvcore.Size(0, 0);
-  Offset _startOffsetRate = Offset.zero;
-  Offset _endOffsetRate = Offset.zero;
-  Size _imageViewSize = Size.zero;
+  ImageMat? _source;
+  ImageMat? _result;
+  ImageRegion _imageRegion = ImageRegion.zero();
   double _resultFrac = 0.0;
-  cvcore.Mat? _resultMat;
-  Uint8List? _encodedResultImage;
   Uint8List? _encodedResultTiledImage;
-
-  double get _leftOffsetRate => _startOffsetRate.dx < _endOffsetRate.dx
-      ? _startOffsetRate.dx
-      : _endOffsetRate.dx;
-  double get _topOffsetRate => _startOffsetRate.dy < _endOffsetRate.dy
-      ? _startOffsetRate.dy
-      : _endOffsetRate.dy;
-  double get _widthRate => (_startOffsetRate.dx - _endOffsetRate.dx).abs();
-  double get _heightRate => (_startOffsetRate.dy - _endOffsetRate.dy).abs();
-  cvcore.Size get _leftTopOffset => cvcore.Size(
-      (_leftOffsetRate * _imageSize.width).floor(),
-      (_topOffsetRate * _imageSize.height).floor());
-  cvcore.Size get _size => cvcore.Size((_widthRate * _imageSize.width).round(),
-      (_heightRate * _imageSize.height).round());
-  cvcore.Size get _rightBottomOffset => cvcore.Size(
-      _leftTopOffset.width + _size.width, _leftTopOffset.height + _size.height);
 
   @override
   void initState() {
@@ -116,27 +97,24 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       return;
     }
     setState(() {
-      _imageViewSize = imageViewSize;
+      _imageRegion = _imageRegion.setViewSize(imageViewSize);
     });
   }
 
   void _onDragDone(DropDoneDetails details) async {
     var path = details.files.first.path;
-    var mat = await cv.imreadAsync(path);
-    if (mat.isEmpty) {
+    var tex = await ImageMat.readAsync(path);
+    if (tex == null) {
       setState(() {
-        _sourceMat = null;
-        _encodedSourceImage = null;
-        _imageSize = cvcore.Size(0, 0);
+        _source = null;
+        _imageRegion = ImageRegion.zero();
       });
       return;
     }
-    var (success, encoded) = await cv.imencodeAsync(".png", mat);
     setState(() {
       _sourcePath = path;
-      _sourceMat = mat;
-      _encodedSourceImage = encoded;
-      _imageSize = cvcore.Size(mat.shape[1], mat.shape[0]);
+      _source = tex;
+      _imageRegion = ImageRegion.zero().setSourceImageSize(tex.size);
     });
   }
 
@@ -148,9 +126,10 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     final offsetRate = _getImageOffset(event.localPosition, imageViewSize);
     setState(() {
       _dragging = true;
-      _imageViewSize = imageViewSize;
-      _startOffsetRate = offsetRate;
-      _endOffsetRate = offsetRate;
+      _imageRegion = _imageRegion
+          .setViewSize(imageViewSize)
+          .setStartOffsetRate(offsetRate)
+          .setEndOffsetRate(offsetRate);
     });
   }
 
@@ -163,8 +142,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       return;
     }
     setState(() {
-      _imageViewSize = imageViewSize;
-      _endOffsetRate = _getImageOffset(event.localPosition, imageViewSize);
+      _imageRegion = _imageRegion.setViewSize(imageViewSize).setEndOffsetRate(
+          _getImageOffset(event.localPosition, imageViewSize));
     });
   }
 
@@ -175,8 +154,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     }
     setState(() {
       _dragging = false;
-      _imageViewSize = imageViewSize;
-      _endOffsetRate = _getImageOffset(event.localPosition, imageViewSize);
+      _imageRegion = _imageRegion.setViewSize(imageViewSize).setEndOffsetRate(
+          _getImageOffset(event.localPosition, imageViewSize));
     });
   }
 
@@ -195,7 +174,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   }
 
   void _onSave() async {
-    if (_resultMat == null) {
+    if (_result == null) {
       return;
     }
     final dest = await FilePicker.platform.saveFile(
@@ -207,31 +186,27 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     if (dest == null) {
       return;
     }
-    cv.imwrite(dest, _resultMat!);
+    cv.imwrite(dest, _result!.mat);
   }
 
   void _onStartDetect() async {
-    if (_sourceMat == null) {
+    if (_source == null) {
       return;
     }
-    if (_size.width == 0 || _size.height == 0) {
+    if (_imageRegion.image.width == 0 || _imageRegion.image.height == 0) {
       return;
     }
-    var (resultMat, frac) = ProcessTile().getTile(_sourceMat!.region(cv.Rect(
-        _leftTopOffset.width,
-        _leftTopOffset.height,
-        _size.width,
-        _size.height)));
+    var (resultMat, frac) =
+        ProcessTile().getTile(_source!.mat.region(_imageRegion.image));
     if (resultMat == null) {
       return;
     }
-    var (success, encoded) = await cv.imencodeAsync(".png", resultMat);
+    final result = await ImageMat.fromMat(resultMat);
     var tiled = cv.repeat(resultMat, 2, 2);
     var (successTiled, encodedTiled) = await cv.imencodeAsync(".png", tiled);
     setState(() {
       _resultFrac = frac;
-      _resultMat = resultMat;
-      _encodedResultImage = encoded;
+      _result = result;
       _encodedResultTiledImage = encodedTiled;
     });
   }
@@ -260,20 +235,13 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                       onPointerUp: _onClickImageEnd,
                       child: Stack(
                         children: [
-                          _encodedSourceImage == null
+                          _source == null
                               ? const Text("no image")
                               : Image.memory(
-                                  key: _imageContainerKey,
-                                  _encodedSourceImage!),
+                                  key: _imageContainerKey, _source!.encoded),
                           Positioned.fill(
                             child: CustomPaint(
-                              painter: PaintRect(
-                                  Rect.fromLTWH(
-                                      _leftOffsetRate * _imageViewSize.width,
-                                      _topOffsetRate * _imageViewSize.height,
-                                      _widthRate * _imageViewSize.width,
-                                      _heightRate * _imageViewSize.height),
-                                  Colors.red),
+                              painter: PaintRect(_imageRegion.view, Colors.red),
                             ),
                           )
                         ],
@@ -285,9 +253,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
               child: Column(
                 children: [
                   const Text("detect"),
-                  Text("image size ($_imageSize)"),
+                  Text("image size ${_source?.size.string}"),
                   Text(
-                      "(${_leftTopOffset.width}, ${_leftTopOffset.height}) - (${_rightBottomOffset.width}, ${_rightBottomOffset.height}) - (${_size.width} x ${_size.height})"),
+                      "${_imageRegion.image.leftTop.string} - ${_imageRegion.image.rightBottom.string} / ${_imageRegion.image.size.string}"),
                   ElevatedButton(
                       style: ElevatedButton.styleFrom(
                           backgroundColor:
@@ -297,14 +265,14 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                       onPressed: _onStartDetect,
                       child: const Text("do")),
                   Container(
-                    child: _encodedResultImage == null
+                    child: _result == null
                         ? const Text("no image")
-                        : Image.memory(_encodedResultImage!),
+                        : Image.memory(_result!.encoded),
                   ),
-                  Text("${_resultMat?.shape[1]}x${_resultMat?.shape[0]}"),
-                  _resultMat == null
+                  _result == null || _source == null
                       ? const SizedBox(width: 1, height: 1)
                       : Column(children: [
+                          Text(_result!.size.string),
                           const Text("tiling:"),
                           SizedBox(
                             width: 100,
@@ -314,8 +282,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                                   labelText: "X",
                                 ),
                                 controller: TextEditingController(
-                                    text: (_imageSize.width /
-                                            _resultMat!.shape[1])
+                                    text: (_source!.size.width /
+                                            _result!.size.width)
                                         .toString())),
                           ),
                           SizedBox(
@@ -326,8 +294,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                                     labelText: "Y",
                                   ),
                                   controller: TextEditingController(
-                                      text: (_imageSize.height /
-                                              _resultMat!.shape[0])
+                                      text: (_source!.size.height /
+                                              _result!.size.height)
                                           .toString()))),
                         ]),
                   Text("frac: $_resultFrac"),
