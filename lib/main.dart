@@ -194,16 +194,20 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     return renderBox.size;
   }
 
-  void _onSave() {
-    if (_encodedResultImage == null) {
+  void _onSave() async {
+    if (_resultMat == null) {
       return;
     }
-    FilePicker.platform.saveFile(
+    final dest = await FilePicker.platform.saveFile(
         fileName: _sourcePath == null
             ? "result.png"
             : "${path.basenameWithoutExtension(_sourcePath!)}_tiled${path.extension(_sourcePath!)}",
         initialDirectory: path.dirname(_sourcePath!),
         type: FileType.image);
+    if (dest == null) {
+      return;
+    }
+    cv.imwrite(dest, _resultMat!);
   }
 
   void _onStartDetect() async {
