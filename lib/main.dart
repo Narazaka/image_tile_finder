@@ -296,7 +296,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                               "${_imageRegion.image.size.string} -> ${_result!.size.string}"),
                           const Text("tiling:"),
                           SizedBox(
-                            width: 100,
+                            width: 200,
                             child: TextFormField(
                                 readOnly: true,
                                 decoration: const InputDecoration(
@@ -308,7 +308,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                                         .toString())),
                           ),
                           SizedBox(
-                              width: 100,
+                              width: 200,
                               child: TextFormField(
                                   readOnly: true,
                                   decoration: const InputDecoration(
