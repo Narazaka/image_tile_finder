@@ -214,6 +214,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     if (_sourceMat == null) {
       return;
     }
+    if (_size.width == 0 || _size.height == 0) {
+      return;
+    }
     var (resultMat, frac) = _getTile(_sourceMat!.region(cv.Rect(
         _leftTopOffset.width,
         _leftTopOffset.height,
@@ -363,6 +366,34 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                         : Image.memory(_encodedResultImage!),
                   ),
                   Text("${_resultMat?.shape[1]}x${_resultMat?.shape[0]}"),
+                  _resultMat == null
+                      ? const SizedBox(width: 1, height: 1)
+                      : Column(children: [
+                          const Text("tiling:"),
+                          SizedBox(
+                            width: 100,
+                            child: TextFormField(
+                                readOnly: true,
+                                decoration: const InputDecoration(
+                                  labelText: "X",
+                                ),
+                                controller: TextEditingController(
+                                    text: (_imageSize.width /
+                                            _resultMat!.shape[1])
+                                        .toString())),
+                          ),
+                          SizedBox(
+                              width: 100,
+                              child: TextFormField(
+                                  readOnly: true,
+                                  decoration: const InputDecoration(
+                                    labelText: "Y",
+                                  ),
+                                  controller: TextEditingController(
+                                      text: (_imageSize.height /
+                                              _resultMat!.shape[0])
+                                          .toString()))),
+                        ]),
                   Text("frac: $_resultFrac"),
                   _encodedResultTiledImage == null
                       ? const SizedBox(width: 1, height: 1)
